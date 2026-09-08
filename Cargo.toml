@@ -1,0 +1,18 @@
+[package]
+name = "mls"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+# staticlib for the phones, rlib so the tests can still link it here.
+crate-type = ["staticlib", "rlib"]
+
+[dependencies]
+argon2 = "0.5.3"
+hkdf = "0.13.0"
+openmls = "0.8.1"
+openmls_basic_credential = "0.5.0"
+openmls_rust_crypto = "0.5.1"
+openmls_traits = "0.5.0"
+rand = "0.10.2"
+sha2 = "0.11.0"
