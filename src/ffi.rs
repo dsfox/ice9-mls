@@ -884,8 +884,16 @@ pub unsafe extern "C" fn mls_recovery_auth_secret(
     })
 }
 
+/// Which derivation `mls_recovery_auth_secret` makes. A device that registered
+/// under a smaller number registers again from the words it holds.
+#[unsafe(no_mangle)]
+pub extern "C" fn mls_recovery_derivation() -> u32 {
+    crate::recovery::DERIVATION
+}
+
 /// The 32 bytes the history backup is encrypted with. This one never leaves the
-/// device. Free with `mls_buffer_free`.
+/// device, and nothing uses it yet: it is groundwork for the history backup
+/// (ice9 #43). Free with `mls_buffer_free`.
 ///
 /// # Safety
 /// `phrase` must point at `phrase_len` readable bytes of UTF-8.
@@ -915,6 +923,7 @@ mod recovery_tests {
         let auth = unsafe { mls_recovery_auth_secret(phrase.as_ptr(), phrase.len()) };
         let key = unsafe { mls_recovery_backup_key(phrase.as_ptr(), phrase.len()) };
         assert_eq!(auth.len, 64, "the secret is 32 bytes as hex");
+        assert_eq!(mls_recovery_derivation(), crate::recovery::DERIVATION);
         assert_eq!(key.len, 32);
 
         unsafe {

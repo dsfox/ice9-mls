@@ -18,7 +18,7 @@ use sha2::Sha256;
 
 /// The same 2048 words the server has always used, and the same file: a phrase
 /// minted by one and typed into the other has to mean the same thing.
-/// `tests/wordlists_match.rs` refuses a copy that has drifted.
+/// `tests/test_wordlists_match.py` in ice9 refuses a copy that has drifted.
 const WORDLIST: &str = include_str!("wordlist.txt");
 
 /// What the server is told, and what it can never be told.
@@ -84,6 +84,16 @@ const ARGON_LANES: u32 = 1;
 // keep, since the value is compared, not stored per account with its own salt.
 // Sixteen bytes, comfortably above the minimum Argon2 accepts.
 const AUTH_SALT: &[u8; 16] = b"ice9/rcvry/auth1";
+
+/// Which derivation `auth_secret` is. A device stores the number it registered
+/// under and registers again when the core it runs says another - so it is the
+/// core that says it, beside the derivation itself, and a client cannot ship a
+/// new derivation under an old number or the other way round.
+///
+/// 1 and 2 were the HKDF strings before and after the rename, 3 the number iOS
+/// took for Argon2id while its library still made HKDF (#69). 4 is the first
+/// that every device reaches with Argon2id actually inside it.
+pub const DERIVATION: u32 = 4;
 
 /// What is sent to the server in place of the words, as lower-case hex.
 ///
@@ -180,5 +190,8 @@ mod tests {
             auth_secret("abandon ability able about above absent"),
             "72984966160cb343b570b1d05db428de2110fe0c1471d2a200d54621cf9d28a0"
         );
+        // Pinned together: a new value above means a new number here, or the
+        // devices that registered the old one never register again.
+        assert_eq!(DERIVATION, 4);
     }
 }
