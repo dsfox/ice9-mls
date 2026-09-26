@@ -32,11 +32,20 @@ fn the_sender_cannot_read_their_own_message() {
         b"hello".to_vec()
     );
 
+    // Refused, and by this name: iOS files a message refused this way as its
+    // own and Android leaves it for the copy it kept. openmls 0.9 answers it
+    // as an empty message instead, which to both clients means "a commit
+    // moved the conversation on" - so the core keeps the refusal.
     let own = alice_group.decrypt(&alice, &ciphertext);
-    assert!(
-        own.is_err() || own.unwrap().is_none(),
-        "the sender could read their own message, and the clients assume otherwise"
-    );
+    match own {
+        Err(e) => assert!(
+            e.to_string().contains("CannotDecryptOwnMessage"),
+            "the sender's own message was refused as something else: {e}"
+        ),
+        Ok(opened) => panic!(
+            "the sender's own message was answered with {opened:?}, and the clients read only a refusal as their own"
+        ),
+    }
 }
 
 /// A message sent before the other side joined is still readable afterwards.

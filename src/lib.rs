@@ -389,6 +389,15 @@ impl Group {
             ProcessedMessageContent::ApplicationMessage(message) => {
                 Ok(Some(message.into_bytes()))
             }
+            // The sender's own message. openmls 0.8 refused it with
+            // CannotDecryptOwnMessage and 0.9 answers it as a message with
+            // nothing in it; the clients read the refusal by that name (iOS
+            // files it as written here, Android leaves it for its own copy), so
+            // it stays a refusal by that name rather than becoming an empty
+            // answer that means "a commit moved the conversation on".
+            ProcessedMessageContent::OwnPrivateMessage => Err(Error::Message(
+                "cannot process the message: CannotDecryptOwnMessage".into(),
+            )),
             ProcessedMessageContent::StagedCommitMessage(commit) => {
                 self.inner
                     .merge_staged_commit(&identity.provider, *commit)
@@ -623,33 +632,26 @@ impl Group {
             .try_into_protocol_message()
             .map_err(|e| Error::Message(format!("that was not a group message: {e:?}")))?;
 
-        let processed = match self
+        let processed = self
             .inner
             .process_message(&identity.provider, protocol_message)
-        {
-            Ok(processed) => processed,
+            .map_err(|e| Error::Message(format!("cannot process the commit: {e:?}")))?;
+
+        match processed.into_content() {
             // Ours, come back to us. If it is still staged this applies it; if
             // it was applied already, merging a group with nothing pending
             // changes nothing, which is the same answer.
             //
             // Two names for one thing, and which one arrives depends on how the
-            // handshake travels. Ours travels as ciphertext, so it is refused at
-            // the decryption step, before anything can look at what it is: a
-            // sender cannot decrypt their own message. Sent in the clear it
-            // would get as far as being read and refused there instead. Both are
-            // said here because the wire format is a setting, and a setting can
-            // change without this line being revisited.
-            Err(ProcessMessageError::ValidationError(
-                ValidationError::CannotDecryptOwnMessage,
-            ))
-            | Err(ProcessMessageError::InvalidCommit(StageCommitError::OwnCommit)) => {
+            // handshake travels. Ours travels as ciphertext, which a sender
+            // cannot open, so it comes back as our own private message. Sent in
+            // the clear it would be read and recognised as the commit pending
+            // here. Both are said because the wire format is a setting, and a
+            // setting can change without this line being revisited.
+            ProcessedMessageContent::OwnPrivateMessage | ProcessedMessageContent::OwnPendingCommit => {
                 self.accept_own_commit(identity)?;
-                return Ok(false);
+                Ok(false)
             }
-            Err(e) => return Err(Error::Message(format!("cannot process the commit: {e:?}"))),
-        };
-
-        match processed.into_content() {
             ProcessedMessageContent::StagedCommitMessage(staged) => {
                 self.inner
                     .merge_staged_commit(&identity.provider, *staged)
