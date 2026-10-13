@@ -10,7 +10,7 @@ crate-type = ["staticlib", "rlib"]
 [dependencies]
 argon2 = "0.6.0"
 hkdf = "0.13.0"
-openmls = "0.9.0"
+openmls = "0.9.1"
 openmls_basic_credential = "0.6.0"
 openmls_rust_crypto = "0.6.0"
 openmls_traits = "0.6.0"
