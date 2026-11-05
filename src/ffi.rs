@@ -760,6 +760,107 @@ pub unsafe extern "C" fn mls_key_package_name(
     })
 }
 
+/// The key a key package's device signs with, which is what the key log holds
+/// for it (#44). Free the buffer with `mls_buffer_free`.
+///
+/// # Safety
+/// `key_package` must point at `len` bytes.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn mls_key_package_signature_key(
+    key_package: *const c_uchar,
+    len: usize,
+) -> MlsBuffer {
+    guarded(MlsBuffer::empty(), || {
+        let key_package = unsafe { slice(key_package, len) }?;
+        Ok(MlsBuffer::from(
+            Group::key_package_signature_key(key_package).map_err(|e| e.to_string())?,
+        ))
+    })
+}
+
+fn one_hash(bytes: &[u8], what: &str) -> Result<crate::keylog::Hash, String> {
+    <crate::keylog::Hash>::try_from(bytes).map_err(|_| format!("{what} is {} bytes, not a hash", bytes.len()))
+}
+
+/// Whether the key log's head is signed by `log_key` (#44).
+///
+/// # Safety
+/// Every pointer must point at the length given beside it.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn mls_key_log_head_is_signed(
+    size: u64,
+    root: *const c_uchar,
+    root_len: usize,
+    date: i32,
+    log_key: *const c_uchar,
+    log_key_len: usize,
+    signature: *const c_uchar,
+    signature_len: usize,
+) -> bool {
+    guarded(false, || {
+        let root = one_hash(unsafe { slice(root, root_len) }?, "the root")?;
+        let log_key = unsafe { slice(log_key, log_key_len) }?;
+        let signature = unsafe { slice(signature, signature_len) }?;
+        Ok(crate::keylog::head_is_signed(size, &root, date, log_key, signature))
+    })
+}
+
+/// Whether the log of `size` with `root` holds, at `index`, the key
+/// `signature_key` for the device `name` of `user_id` (#44). `proof` is the
+/// entry's hashes laid end to end.
+///
+/// # Safety
+/// Every pointer must point at the length given beside it.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn mls_key_log_proves_inclusion(
+    user_id: i64,
+    name: *const c_uchar,
+    name_len: usize,
+    signature_key: *const c_uchar,
+    signature_key_len: usize,
+    index: u64,
+    size: u64,
+    proof: *const c_uchar,
+    proof_len: usize,
+    root: *const c_uchar,
+    root_len: usize,
+) -> bool {
+    guarded(false, || {
+        let name = unsafe { slice(name, name_len) }?;
+        let signature_key = unsafe { slice(signature_key, signature_key_len) }?;
+        let proof = if proof_len == 0 { &[][..] } else { unsafe { slice(proof, proof_len) }? };
+        let proof = crate::keylog::hashes(proof).ok_or("the proof is not whole hashes")?;
+        let root = one_hash(unsafe { slice(root, root_len) }?, "the root")?;
+        let leaf = crate::keylog::leaf_hash(&crate::keylog::record(user_id, name, signature_key));
+        Ok(crate::keylog::proves_inclusion(index, size, &leaf, &proof, &root))
+    })
+}
+
+/// Whether the log of `second` with `second_root` holds the log of `first`
+/// with `first_root` as a prefix (#44). `proof` is the hashes end to end.
+///
+/// # Safety
+/// Every pointer must point at the length given beside it.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn mls_key_log_proves_consistency(
+    first: u64,
+    second: u64,
+    first_root: *const c_uchar,
+    first_root_len: usize,
+    second_root: *const c_uchar,
+    second_root_len: usize,
+    proof: *const c_uchar,
+    proof_len: usize,
+) -> bool {
+    guarded(false, || {
+        let first_root = one_hash(unsafe { slice(first_root, first_root_len) }?, "the first root")?;
+        let second_root = one_hash(unsafe { slice(second_root, second_root_len) }?, "the second root")?;
+        let proof = if proof_len == 0 { &[][..] } else { unsafe { slice(proof, proof_len) }? };
+        let proof = crate::keylog::hashes(proof).ok_or("the proof is not whole hashes")?;
+        Ok(crate::keylog::proves_consistency(first, second, &first_root, &second_root, &proof))
+    })
+}
+
 /// The name this device goes under. Free the buffer with `mls_buffer_free`.
 ///
 /// # Safety

@@ -11,6 +11,7 @@
 //! it was chosen over MTProto's secret chats.
 
 pub mod ffi;
+pub mod keylog;
 pub mod persistence;
 pub mod recovery;
 
@@ -462,6 +463,19 @@ impl Group {
             .credential
             .serialized_content()
             .to_vec())
+    }
+
+    /// The key a key package's device signs with, which is what the key log
+    /// holds for it (#44). Read without verifying anything: the caller checks
+    /// this key against the log, and MLS checks the package with it.
+    pub fn key_package_signature_key(bytes: &[u8]) -> Result<Vec<u8>, Error> {
+        let message = MlsMessageIn::tls_deserialize_exact(bytes)
+            .map_err(|e| Error::Message(format!("cannot read the key package: {e:?}")))?;
+        let key_package: KeyPackageIn = match message.extract() {
+            MlsMessageBodyIn::KeyPackage(key_package) => key_package,
+            _ => return Err(Error::Message("that was not a key package".into())),
+        };
+        Ok(key_package.unverified_credential().signature_key.as_slice().to_vec())
     }
 
     /// The name this device goes under, which is the name of its own leaf.
