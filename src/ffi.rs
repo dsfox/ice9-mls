@@ -873,6 +873,19 @@ pub unsafe extern "C" fn mls_identity_name(identity: *const Identity) -> MlsBuff
     })
 }
 
+/// The key this device signs with, which the key log holds for it (#44). Free
+/// the buffer with `mls_buffer_free`.
+///
+/// # Safety
+/// `identity` must be a live handle.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn mls_identity_signature_key(identity: *const Identity) -> MlsBuffer {
+    guarded(MlsBuffer::empty(), || {
+        let identity = unsafe { identity.as_ref() }.ok_or("no identity")?;
+        Ok(MlsBuffer::from(Group::own_signature_key(identity)))
+    })
+}
+
 #[cfg(test)]
 mod persistence_tests {
     use super::*;

@@ -1219,3 +1219,15 @@ fn a_message_from_the_epoch_it_joined_at_survives_the_reader_moving_on() {
          anybody says in a new group is written in exactly that window"
     );
 }
+
+/// A phone tells its own key in the key log from one it never made (#44): the
+/// key it says it signs with is the one its key packages carry.
+#[test]
+fn a_device_knows_the_key_its_packages_carry() {
+    let device = mls::Identity::new(b"7/phone").unwrap();
+    let package = device.key_package().unwrap();
+    let carried = mls::Group::key_package_signature_key(&package).unwrap();
+    assert_eq!(mls::Group::own_signature_key(&device), carried);
+    let other = mls::Identity::new(b"7/phone").unwrap();
+    assert_ne!(mls::Group::own_signature_key(&other), carried, "two devices of one name share a key");
+}

@@ -491,6 +491,13 @@ impl Group {
         identity.name.clone()
     }
 
+    /// The key this device signs with: what the key log holds for it (#44).
+    /// A phone reading its own account's entries tells its own key from one
+    /// it never made by this.
+    pub fn own_signature_key(identity: &Identity) -> Vec<u8> {
+        identity.signer.public().to_vec()
+    }
+
     /// Reopens a conversation a restored device was already in. Returns nothing
     /// when this device does not know that conversation - which is a plain
     /// answer, not an error: a chat may exist on the server and not here.
